@@ -5,23 +5,29 @@ from change_background_to_none import change_background
 from PIL import Image
 
 class FaceRegionExtractor:
-    def __init__(self, whole_image_path, face_image_path):
+    def __init__(self, face_image_path, whole_image_path = None):
         # reading images ...
         self.whole_image_path = whole_image_path
+        if whole_image_path != None:
+            self.whole_image = cv2.imread(whole_image_path)
+        
         self.face_image_path = face_image_path
-        self.whole_image = cv2.imread(whole_image_path)
         self.face_image = cv2.imread(face_image_path)
         self.gray = cv2.cvtColor(self.face_image, cv2.COLOR_BGR2GRAY)
         
         # initialising 68 point model ....
         self.hog_face_detector = dlib.get_frontal_face_detector()
         self.dlib_facelandmark = dlib.shape_predictor("../models/shape_predictor_68_face_landmarks.dat")
+        self.faces = self.hog_face_detector(self.gray)
         
         # used to get output ....
         self.output_image = [np.zeros_like(self.face_image) for _ in range(3)]
         self.part = ["_head.png", "_eyes.png", "_chin.png"]
         self.jaw_range = list(range(1, 16))
 
+    def get_attributes(self):
+        return self.dlib_facelandmark, self.faces, self.gray
+    
     def write_image(self, indeces, ind):
         hull = cv2.convexHull(np.array(indeces))
         region_mask = np.zeros_like(self.gray)
@@ -34,15 +40,14 @@ class FaceRegionExtractor:
         cv2.imwrite(output_path, self.output_image[ind])
         
     def extract_regions(self):
-        faces = self.hog_face_detector(self.gray)
         val = 80 # for our used sprite images always 80, but we may need to calcuate it.
-        for face in faces:
+        for face in self.faces:
             face_landmarks = self.dlib_facelandmark(self.gray, face)
             if face_landmarks.part(0).x < 256:
                 val = face_landmarks.part(0).x
 
         # val is basically to ensure we don't overlap one image with another (i.e maintain 256 width for each image in sprite)
-        for face in faces:
+        for face in self.faces:
             face_landmarks = self.dlib_facelandmark(self.gray, face)
 
             pixel_st_x = face_landmarks.part(0).x - val
@@ -77,6 +82,6 @@ class FaceRegionExtractor:
 
         cv2.imwrite(self.whole_image_path.split('.png')[0] + '_torso.png', torso_image)
         
-        change_background(self.whole_image_path.split('.png')[0] + '_torso.png')
-        for i in self.part:
-            change_background(self.whole_image_path.split('.png')[0] + i)
+        # change_background(self.whole_image_path.split('.png')[0] + '_torso.png')
+        # for i in self.part:
+            # change_background(self.whole_image_path.split('.png')[0] + i)
